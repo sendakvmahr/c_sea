@@ -1,7 +1,5 @@
-pos_tagging/output.txt
-data_access/nets/*
-data_access/sqlite/*
-
+/text/corpora/
+/text/outputs/
 #Copypaste python gitignores
 # Byte-compiled / optimized / DLL files
 __pycache__/
