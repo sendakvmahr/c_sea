@@ -1,4 +1,5 @@
 from pos_tagger import POS_Tagger
+from util import var
 import random
 
 class Random_Tagger(POS_Tagger):
