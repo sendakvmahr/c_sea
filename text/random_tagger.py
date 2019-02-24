@@ -1,5 +1,5 @@
-from pos_tagger import POS_Tagger
-from util import var
+from text.pos_tagger import POS_Tagger
+from util import _vars
 import random
 
 class Random_Tagger(POS_Tagger):
