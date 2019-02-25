@@ -1,9 +1,9 @@
 """
 Base class.
 """
+from util import _vars
 
 class POS_Tagger():
-    POS_TAGS = ['ADJ', 'ADP', 'ADV', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NOUN', 'NUM', 'PART', 'PRON', 'PROPN', 'PUNCT', 'SCONJ', 'SYM', 'VERB', 'X']
     
     def __init__(self):
         pass
