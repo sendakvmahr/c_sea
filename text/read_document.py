@@ -13,9 +13,16 @@ it's english
 it's not all all numbers and spcial characters
 
 and if the counts are above a cutoff
-    
+
+
+basic tokenizer should split on newlines
 """
 import re as re
+import tokenizers.basic_tokenizer as bt
+import collections
+
+def normalize_for_db(text):
+    return text.lower().strip()
 
 def is_english(s):
     """
@@ -39,14 +46,20 @@ def no_special(s):
     
 class Word_Reader():
     def __init__(self):
-        self.cutoff = cutoff
+        self.cutoff = "cutoff"
         self.filter_functions = [is_english]
+    def accept(self, word):
+        return is_not_number(word) and no_special(word) and is_english(word)
 
 
-functions = [no_special, is_not_number, is_english]
-
-k = ["one", "234", "!!!!", "Hello!"]
-
-for i in k:
-    for f in functions: 
-        print(i, f(i))
+with open("./corpora/test.txt", "r") as file:
+    text = file.read()
+    tokenizer = bt.Basic_Tokenizer()
+    wr = Word_Reader()
+    words = tokenizer.tokenize(text)
+    words = [normalize_for_db(w) for w in words]
+    result = collections.defaultdict(int)
+    for w in words:
+        if wr.accept(w):
+            result[w] += 1
+    print(result)
