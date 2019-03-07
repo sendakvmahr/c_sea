@@ -32,21 +32,25 @@ class Token_To_DB_Key():
         self.conversion_functions = conversion_functions
         self.filter_functions = filter_functions
     
+    def _check_eligible(self, token):
+        is_eligible = True
+        for f in self.filter_functions:
+            is_eligible = is_eligible and f(token)
+        return is_eligible
+        
+    def _convert(self, t):
+        key = t
+        for g in self.conversion_functions:
+            key = g(key)
+        return key
+        
     def get_key(self, token):
         if type(token) == str:
-            is_eligible = True
-            for f in self.filter_functions:
-                is_eligible = is_eligible and f(token)
-            if is_eligible:
-                key = token
-                for g in self.conversion_functions:
-                    key = g(key)
-                return key
+            if self._check_eligible(token):
+                return self._convert(token)
             else:
                 return ""
         else: 
-            raise NotImplementedError("Revisit when token class is more throughly implemented")
-d = ['noe', '23l', '402-', 'jasdfidkl', '#@$GFvf', 'fghsdfgsdf']
-t = Token_To_DB_Key(CONVERSION_FUNCTIONS, FILTER_FUNCTIONS)
-for a in d:
-    print(t.get_key(a))
+            if self._check_eligible(token.text):
+                return self._convert(token.text)
+            

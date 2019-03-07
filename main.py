@@ -20,7 +20,7 @@ class Cerulean_Sea_Text():
         print(tokens)
         tagged_tokens = self.tagger.tag(tokens)
         print(tagged_tokens)
-        requests = [(self.converter.get_key(token[0]), 1) for token in tagged_tokens]
+        requests = [(self.converter.get_key(token), 1) for token in tagged_tokens]
         print(requests)
         for item in requests:
             self.db.add_item(item[0], item[1])
