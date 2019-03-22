@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<link rel="stylesheet" type="text/css" href="./css/normalize.css"/>
+	</head>
+    <style>
+        canvas, body, #center-container{
+            height: 100vh;
+            width: 100vw;
+            position: absolute;
+            top: 0; left: 0;
+        }
+        #foreground-canvas{ 
+            pointer-events: none;
+            z-index: 3030;
+			background: repeating-linear-gradient(to bottom, rgba(200, 200, 200, .3), rgba(62, 150, 255, .3) 3px, transparent 5px),          
+						radial-gradient(ellipse at center, rgba(0,0,0,0) 0%,rgba(0,0,0,0) 7%,rgba(0, 0, 0, 0.79) 72%,rgba(0, 0, 0, 0.91) 89%,rgb(0, 0, 0) 100%)
+
+        }
+        #background-canvas {
+            z-index: 24;
+        }
+        #center-container{
+			z-index: 953;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			text-align: center;
+        }
+		
+		#center-container > div, #center-container input {
+			margin: 0 50px;
+		}
+        #quote {
+		    font-size:  3em;
+			font-family: Consolas;
+		}
+        input { 
+			font-size:  3em;
+			font-family: Consolas;
+			text-align: center;
+        }
+    </style>
+
+	<body>
+        <canvas id="background-canvas"></canvas>
+        <div id="center-container">
+			<div id="quote">
+				<p>My battery is low and it's getting dark. </p>
+			</div>
+            <input type="text"></input>
+        </div>
+        <canvas id="foreground-canvas"></canvas>
+	</body>
+    <script>
+        var topCanvas = document.getElementById("foreground-canvas");
+        var tctx = topCanvas.getContext("2d");
+        var bottomCanvas = document.getElementById("background-canvas");
+        var bctx = bottomCanvas.getContext("2d");
+		var tick = 0;
+	
+		function drawSquare(ctx, x, y, dim, color) {
+			ctx.beginPath();
+			ctx.rect(x, y, dim, dim);
+			ctx.fillStyle = color;
+			ctx.fill();
+		}
+		
+		function updateBG(ctx){
+		// clear rect
+			ctx.clearRect (0, 0, document.body.clientWidth, document.body.clientHeight);
+			var dim = 30;
+			var border = 5;
+			for (let x=0; x<40; x++) {
+				for (let y=0; y<30; y++) {
+					var shrink = (tick % 80) ;
+					drawSquare(ctx, x * (dim + border) + (shrink/2)  , y * (dim + border) + (shrink/2), dim - shrink, "#ccdddd");
+				}
+			}
+			tick++;
+		}
+		
+		function resizeCanvases(){
+			bottomCanvas.width = document.body.clientWidth; 
+			bottomCanvas.height = document.body.clientHeight;
+			topCanvas.width = document.body.clientWidth; 
+			topCanvas.height = document.body.clientHeight;
+		}
+
+		
+        var lastTime = (new Date()).getTime();
+        var currentTime = 0;
+        var timeDelta = 0;
+		var interval = 1000/30; // 1000ms / 30 frames = 30 fps cap
+
+		function resize() { resizeCanvases(); }
+		window.addEventListener('resize', resize);
+		
+        function start() {
+            window.requestAnimationFrame(start);
+            currentTime = (new Date()).getTime();
+            timeDelta = currentTime - lastTime;
+            if (timeDelta > interval) 
+            {
+                timeDelta = 0;           
+                lastTime = currentTime;
+				updateBG(bctx);
+            }
+        }
+		resizeCanvases();
+        start();
+		
+    </script>
+</html>
+
