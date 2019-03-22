@@ -10,5 +10,6 @@ class Random_Tagger(POS_Tagger):
     def tag(self, words):
         result = []
         for w in words:
-            result.append((w, random.choice(_vars.POS_TAGS)))
+            w.assign_pos(random.choice(_vars.POS_TAGS))
+            result.append(w)
         return result
