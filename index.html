@@ -71,10 +71,13 @@
 			ctx.clearRect (0, 0, document.body.clientWidth, document.body.clientHeight);
 			var dim = 30;
 			var border = 5;
+			var r = 255 - tick;
+			if (r < 0){r=0};
 			for (let x=0; x<40; x++) {
 				for (let y=0; y<30; y++) {
 					var shrink = (tick % 80) ;
-					drawSquare(ctx, x * (dim + border) + (shrink/2)  , y * (dim + border) + (shrink/2), dim - shrink, "#ccdddd");
+					drawSquare(ctx, x * (dim + border) + (shrink/2)  , y * (dim + border) + (shrink/2), dim - shrink, "rgba("+r+","+r+","+r+")");
+					document.getElementById("background-canvas").style.background = "rgba("+Math.floor(r*.8)+","+Math.floor(r*.8)+","+Math.floor(r*.8)+")";
 				}
 			}
 			tick++;
