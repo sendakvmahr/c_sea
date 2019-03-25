@@ -1,0 +1,4 @@
+reader class that looks at files and judges length
+file inputs...
+
+gitignore all DBs
