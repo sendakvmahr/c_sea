@@ -13,10 +13,11 @@ def is_english(s):
         return True
 
 print("READING")
-with open("output.txt", "r", encoding="UTF-8") as file:
+with open("./outputs/output.txt", "r", encoding="UTF-8") as file:
     s = file.read()[28:-2]
     temp = ""
-    for i in range(len(s)):
+    #for i in range(len(s)):
+    for i in range(100):
         char = s[i]
         if char == " ":
             continue
@@ -30,12 +31,13 @@ with open("output.txt", "r", encoding="UTF-8") as file:
             temp += char
 print("READ")          
 items.sort()
+print(items)
 print("SORTED")
 
-conn = sqlite3.connect("wordbank.db")
+conn = sqlite3.connect("./outputs/wordbank.db")
 cur = conn.cursor()
 print("SENDING")
-cur.executemany("INSERT INTO wordbank (word, count) VALUES (?, ?)", items)
+cur.executemany("INSERT INTO words (word, count) VALUES (?, ?)", items)
 conn.commit()
 conn.close()
 print("DONE")
