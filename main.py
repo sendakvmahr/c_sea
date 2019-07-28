@@ -34,7 +34,7 @@ class Cerulean_Sea_Text():
                 tokens = self._frequency_analyze(tokens)
                 
                 for t in tokens:
-                    self.db.add_item(t)
+                    self.db.add(t)
 
                 #self._print_text()
                 #print(tagged_tokens)

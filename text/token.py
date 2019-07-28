@@ -14,4 +14,4 @@ class Token():
     		for word in words:
     			self._adjacent[word] += 1
     	else:
-    		self._adjacent[word] += 1
+    		self._adjacent[words] += 1
