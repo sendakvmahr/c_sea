@@ -25,7 +25,7 @@ class Cerulean_Sea_Text():
                         print(t)
 
         def record_text(self, text):
-                text = "Here is some sample text. This is a very simple test case."
+                text = "Here is some sample text. This is a very simple test case. Here is some sample text. This is a very simple test case."
                 print(text)
                 tokens = self.tokenizer.tokenize(text)
                 tokens = self.tagger.tag(tokens)
@@ -34,7 +34,7 @@ class Cerulean_Sea_Text():
                 tokens = self._frequency_analyze(tokens)
                 
                 for t in tokens:
-                    self.db.add(t)
+                    self.db.increment(t)
 
                 #self._print_text()
                 #print(tagged_tokens)
@@ -62,7 +62,8 @@ if __name__ == "__main__":
         sample_text = file.read()
         file.close()
         c_sea = Cerulean_Sea_Text(TAGGER, TOKENIZER, DB)
-        while True:
+        t="c"
+        while t != "quit":
                 t = "This is a sample of a text sentence."
                 t = sample_text
                 c_sea.record_text(t)
