@@ -1,11 +1,13 @@
 import text.taggers.random_tagger
 import text.tokenizers.basic_tokenizer
-import data_access.db_wrapper
-import data_access.token_to_db_key
+import data_access.db_wrapper 
+import data_access.token_to_db_key as token_to_key
 
 TAGGER = text.taggers.random_tagger.Random_Tagger()
 TOKENIZER = text.tokenizers.basic_tokenizer.Basic_Tokenizer()
-DB = data_access.db_wrapper.DB_Connection()
+TEXT_TO_TOKEN = token_to_key.Token_To_DB_Key(token_to_key.FILTER_FUNCTIONS, token_to_key.CONVERSION_FUNCTIONS)
+DB = data_access.db_wrapper.DB_Connection(TEXT_TO_TOKEN)
+
 """
 because db should be tied into the conversion key, have the db connection object
 be made with the wrapper, conversion formula, and the db itself

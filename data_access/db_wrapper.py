@@ -5,7 +5,7 @@ from text import token
 DEFAULT_DB = "text.db"
 
 class DB_Connection():
-    def __init__(self, threshold=5, db=DEFAULT_DB):
+    def __init__(self, token_converter, threshold=100, db=DEFAULT_DB):
         self.commands = {
             "add": "INSERT INTO VOCAB (ID, WORD, WORD_COUNT) VALUES (null, ?, ?)",
             "increment": "UPDATE VOCAB SET WORD_COUNT = WORD_COUNT + ? WHERE WORD=?"
@@ -20,9 +20,15 @@ class DB_Connection():
         if makeDB:
             self._cursor.execute("CREATE TABLE `VOCAB` ( `ID` INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE, `WORD` TEXT, `WORD_COUNT` INTEGER )")
         self.threshold = threshold
+        self.token_converter = token_converter
 
     def increment(self, word):
         is_add = not self.is_in(word)
+        if (not is_add):
+            for key, items in self.queue.items():
+                if word in items:
+                    pass #modify the item so increment is bigger, but should reform command queues first
+        check to see if word is already added, in that case increment it in queue command too
         command = "add" if is_add else "increment"
         inputs = (word, 1) if is_add else (1, word)
         self._queue_command(command, inputs)
