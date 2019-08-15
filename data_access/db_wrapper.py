@@ -27,8 +27,9 @@ class DB_Connection():
         if (not is_add):
             for key, items in self.queue.items():
                 if word in items:
-                    pass #modify the item so increment is bigger, but should reform command queues first
-        check to see if word is already added, in that case increment it in queue command too
+                    pass 
+#modify the item so increment is bigger, but should reform command queues first
+        #check to see if word is already added, in that case increment it in queue command too
         command = "add" if is_add else "increment"
         inputs = (word, 1) if is_add else (1, word)
         self._queue_command(command, inputs)
