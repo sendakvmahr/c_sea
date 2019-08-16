@@ -17,7 +17,9 @@ class Token():
     		self._adjacent[words] += 1
     
     def __eq__(self, other):
-        return self.text == other.text 
+        if type(self) == type(other):
+            return self.text == other.text 
+        return self.text == other
             
     def __str__(self):
         return "Token(text='{}', pos='{}', _adjacent='{}')".format(self.text, self.pos, str(self._adjacent))

@@ -5,7 +5,7 @@ from text import token
 DEFAULT_DB = "text.db"
 
 class DB_Connection():
-    def __init__(self, token_converter, threshold=100, db=DEFAULT_DB):
+    def __init__(self, token_converter, threshold=2, db=DEFAULT_DB):
         self.commands = {
             "add": "INSERT INTO VOCAB (ID, WORD, WORD_COUNT) VALUES (null, ?, ?)",
             "increment": "UPDATE VOCAB SET WORD_COUNT = WORD_COUNT + ? WHERE WORD=?"
