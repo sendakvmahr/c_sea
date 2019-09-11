@@ -1,6 +1,8 @@
+#stuff to generate
 /text/corpora/
 /text/outputs/
 *.db
+
 #Copypaste python gitignores
 # Byte-compiled / optimized / DLL files
 __pycache__/
