@@ -47,21 +47,17 @@ async def update_db(db, frequencies, pairings, pos):
     pass
 
 def read_data(file_name):
-    
-    commands = defaultdict(list)
     lines = []
-    
     pairings = {}
-    fq = defaultdict(int)
+    frequencies = {}
     pos = {}
     
     with open(file_name) as file:
         lines = file.readlines()
     
     for line in lines:
-        
         pa, fq, pos = extract_data(line.replace('"', ""))
-        if pa != 0:
+        if pa != 0: # html line
             for word, count in fq.items():
                 frequencies[word] += count
 
@@ -115,30 +111,37 @@ def is_english(s):
         s.encode(encoding='utf-8').decode('ascii')
     except UnicodeDecodeError:
         return False
-    else:
-        return re.match(r".*[a-zA-Z]", s)
+    return bool(re.match(r".*[a-zA-Z]", s))
+
+def do_index(token):
+    return (token.pos_ != "PROPN" and (is_english(token.text))) or (token.pos_ == "PUNCT")
 
 def extract_data(line):
+    """
+    pairings = {(word1, word2): count}
+    frequencies = {word: count}
+    words_pos = {word: {pos: count}}
+    """
     if line == "" or line[0] == "<": return [0,0,0]
     pairings = defaultdict(int)
     frequencies = defaultdict(int)
-    words_pos = defaultdict(int)
+    words_pos = defaultdict(lambda: defaultdict(int))
     line = ns.space(line)
     for token in line: 
         if token.pos_ != "PROPN" and is_english(token.text):
-            words_pos[token.text.lower()] += 1
+            words_pos[token.text.lower()][token.pos_] += 1
             frequencies[token.text.lower()] += 1
     cap = len(line)
     for ti in range(cap):
-        if line[ti].pos_ != "PROPN" and is_english(token.text):
-            lower = ti if ti < DEG_ASSOCIATION else DEG_ASSOCIATION
-            upper = cap - ti -1 if ti >= cap - DEG_ASSOCIATION -1 else DEG_ASSOCIATION
+        if do_index(line[ti]):
+            lower = ti if ti < ns.degree else ns.degree
+            upper = cap - ti -1 if ti >= cap - ns.degree -1 else ns.degree
             # the -1 is because (range(1, 1) won't run once for 1
             for i in range(lower):
-                if line[ti-i-1].pos_ != "PROPN" and is_english(token.text):
+                if do_index(line[ti-i-1]):
                     pairings[(line[ti-i-1].text.lower(), line[ti].text.lower())] += 1
             for i in range(upper):
-                if line[ti+i+1].pos_ != "PROPN" and is_english(token.text):
+                if do_index(line[ti+i+1]):
                     pairings[(line[ti].text.lower(), line[ti+i+1].text.lower())] += 1             
     return [pairings, frequencies, words_pos]
 
@@ -146,8 +149,22 @@ def extract_data(line):
 if __name__ == "__main__":
     #test = "AA/wiki_00"
     #read_data(WIKI_DIR + test)
+    manager = multiprocessing.Manager()
+    ns = manager.Namespace()
+    ns.read = 0
+    ns.space = spacy.load("en")
+    ns.degree = DEG_ASSOCIATION
+    lines = """
+    Here, I am looking for something. Here, I am looking for something. 
+    Make my monster GROW!
+    Who are you?
+    It's over here.
+    """.split("\n")
+    for i in lines:
+        print(extract_data(i))
+
+
     abspath = os.path.abspath(WIKI_DIR)
-    lines = 0
     files = []
     
     for f1 in os.listdir(WIKI_DIR):
