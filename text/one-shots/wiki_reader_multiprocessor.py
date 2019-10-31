@@ -44,13 +44,31 @@ async def update_db(db, frequencies, pairings, pos):
     # cache words in there
     # determine what maps to what for all the db options
     # execute them
+    # DB.commit()
+
     pass
 
+async def get_ids(pair):
+    print(pair)
+    #id0 = CURSOR.execute('SELECT * FROM words WHERE word=?', (pair[0],)).fetchone()[0])
+    #id1 = CURSOR.execute('SELECT * FROM words WHERE word=?', (pair[1],)).fetchone()[0])
+    return (id0, id1)
+
+async def is_in_pairing(ids):
+    CURSOR.execute('SELECT * FROM pairings WHERE word1id=? AND word2id=?', (ids[0], ids[1]))
+    return bool(CURSOR.fetchone())
+
+async def is_in_word(word):
+    return word in WORDS
+    #CURSOR.execute('SELECT * FROM words WHERE word=?', (word,))
+    #return bool(CURSOR.fetchone())
+
 def read_data(file_name):
+    """ Processes a file """
     lines = []
     pairings = {}
     frequencies = {}
-    pos = {}
+    parts_of_speech = {}
     
     with open(file_name) as file:
         lines = file.readlines()
@@ -60,53 +78,14 @@ def read_data(file_name):
         if pa != 0: # html line
             for word, count in fq.items():
                 frequencies[word] += count
-
-    for word, count in frequencies.items():
-        c[word].append(word, count, count)
-    
-    CURSOR.executemany(word, c[word])
-    DB.commit()
-        
-    """
-    if pairings != 0:
-        for word, count in frequencies.items():
-            if is_in_word(word):
-                c[update_word].append((count, word))
-            else:
-                c[insert_word].append((word, count))
-        CURSOR.executemany(insert_word, c[insert_word])
-        CURSOR.executemany(update_word, c[update_word])
-        DB.commit()
-        for pairing, count in pairings.items():
-            ids = get_ids(pairing)
-            if is_in_pairing(ids):
-                c[update_pairings].append((count, ids[0], ids[1]))
-            else:
-                c[insert_pairings].append((ids[0], ids[1], count))
-        CURSOR.executemany(update_pairings, c[update_pairings])
-        CURSOR.executemany(insert_pairings, c[insert_pairings])
-    """
+    # pos and pairings need to be updated before passed into update_db=
+    # update db needs to be called in an async manner
+    update_db(ns.db, frequencies, pairings, parts_of_speech)
     ns.read += len(lines)
     return ns.read / 109579737
 
-
-
-def get_ids(pair):
-    print(pair)
-    #id0 = CURSOR.execute('SELECT * FROM words WHERE word=?', (pair[0],)).fetchone()[0])
-    #id1 = CURSOR.execute('SELECT * FROM words WHERE word=?', (pair[1],)).fetchone()[0])
-    return (id0, id1)
-
-def is_in_pairing(ids):
-    CURSOR.execute('SELECT * FROM pairings WHERE word1id=? AND word2id=?', (ids[0], ids[1]))
-    return bool(CURSOR.fetchone())
-
-def is_in_word(word):
-    return word in WORDS
-    #CURSOR.execute('SELECT * FROM words WHERE word=?', (word,))
-    #return bool(CURSOR.fetchone())
-
 def is_english(s):
+    """is string english?"""
     try:
         s.encode(encoding='utf-8').decode('ascii')
     except UnicodeDecodeError:
@@ -114,6 +93,7 @@ def is_english(s):
     return bool(re.match(r".*[a-zA-Z]", s))
 
 def do_index(token):
+    """Should token be recorded in DB"""
     return (token.pos_ != "PROPN" and (is_english(token.text))) or (token.pos_ == "PUNCT")
 
 def extract_data(line):
@@ -154,16 +134,9 @@ if __name__ == "__main__":
     ns.read = 0
     ns.space = spacy.load("en")
     ns.degree = DEG_ASSOCIATION
-    lines = """
-    Here, I am looking for something. Here, I am looking for something. 
-    Make my monster GROW!
-    Who are you?
-    It's over here.
-    """.split("\n")
-    for i in lines:
-        print(extract_data(i))
+    ns.db = DEFAULT_DB
 
-
+    lines = []
     abspath = os.path.abspath(WIKI_DIR)
     files = []
     
@@ -185,19 +158,9 @@ if __name__ == "__main__":
     # print(multiprocessing.cpu_count()) #4
     num_processes = 2
     chunksize = int(len(files) / num_processes)
-    
-    
-    
     pool = multiprocessing.Pool(num_processes)
     
     results = pool.imap_unordered(read_data, files, chunksize)
     for r in results: 
         print(r)
-                    #read_data(fpath)
-                        
-                    #file = open(os.path.join(abspath, f1, f), errors='ignore')
-                    #lines += len(file.readlines())
-                    #file.close()
-    #print(lines)
-    #109579737 lines
 
