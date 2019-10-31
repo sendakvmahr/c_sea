@@ -10,8 +10,7 @@ from collections import defaultdict
 DEFAULT_DB = "wikiInhaler.db"
 WIKI_DIR = "../corpora/wikiextractor/"
 DEG_ASSOCIATION = 2
-total = 109579737
-make = True
+total_lines = 109579737
 
 def make_db():
     make_commands = [ 
@@ -82,7 +81,7 @@ def read_data(file_name):
     # update db needs to be called in an async manner
     update_db(ns.db, frequencies, pairings, parts_of_speech)
     ns.read += len(lines)
-    return ns.read / 109579737
+    return ns.read / ns.total_lines
 
 def is_english(s):
     """is string english?"""
@@ -135,8 +134,10 @@ if __name__ == "__main__":
     ns.space = spacy.load("en")
     ns.degree = DEG_ASSOCIATION
     ns.db = DEFAULT_DB
+    ns.total_lines = total_lines
 
-    lines = []
+    make_db()
+
     abspath = os.path.abspath(WIKI_DIR)
     files = []
     
@@ -147,12 +148,6 @@ if __name__ == "__main__":
                 fpath = os.path.join(f1path, f)
                 if not (os.path.isdir(fpath)):
                     files.append(fpath)
-    
-    manager = multiprocessing.Manager()
-    ns = manager.Namespace()
-    ns.read = 0
-    ns.space = spacy.load("en")
-    make_db()
     
     
     # print(multiprocessing.cpu_count()) #4
