@@ -1,40 +1,35 @@
-#import aiosqlite
 import multiprocessing
 import os
 import re
 import spacy
-import sqlite3
 import asyncio
 from collections import defaultdict
 from datetime import datetime
+
+import config
 import pymysql
 
-DEFAULT_DB = "wikiInhaler.db"
-WIKI_DIR = "../corpora/wikiextractor/"
-DEG_ASSOCIATION = 2
-total_lines = 109579737
+connection = pymysql.connect(host='localhost',
+                             user=config.sql_username,
+                             password=config.sql_pw,
+                             db=config.sql_db_name,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor)
 
-def make_db():
-    make_commands = [ 
-    """CREATE TABLE `words` ( `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE, `word` TEXT NOT NULL, `freq` INTEGER NOT NULL )""", 
-    """CREATE TABLE "pairings" ( `word1id` INTEGER NOT NULL, `word2id` INTEGER NOT NULL, `freq` INTEGER, PRIMARY KEY(`word1id`,`word2id`) )""",
-    """CREATE TABLE "pos" ( `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE, `pos` TEXT NOT NULL )""",
-    """CREATE TABLE "pos_list" ( `posid` INTEGER NOT NULL, `wordid` INTEGER NOT NULL, `freq` INTEGER NOT NULL, PRIMARY KEY(`posid`, `wordid`) )""",
-    ]
-    db = sqlite3.connect(DEFAULT_DB)
-    cursor = db.cursor()
-    for c in make_commands:
-        cursor.execute(c)
+print(connection)
+
+def refresh_pos(db):
+	db = connection.cursor()
     pos = ['ADJ', 'ADP', 'ADV', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NOUN', 'NUM', 'PART', 'PRON', 'PROPN', 'PUNCT', 'SCONJ', 'SYM', 'VERB', 'X']
+	sql = "INSERT INTO `pos` (`id`, `pos`) VALUES (%s, %s)"
     for p in range(len(pos)):
-        cursor.execute("INSERT INTO pos (id, pos) VALUES (?, ?)", [p+1, pos[p]])
+		refresh_pos.execute(sql, (p+1, pos[p]))
     db.commit()
-    db.close()
 
 def now():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-async def update_pairings(word_cache, cursor, pairings):
+async def update_pairings(word_cache, cursor, pairings): ###
     update = "UPDATE pairings SET freq = freq + ? WHERE word1id=? AND word2id=?"
     insert = "INSERT INTO pairings (word1id, word2id, freq) VALUES (?, ?, ?)"
     commands = dict()
@@ -52,7 +47,7 @@ async def update_pairings(word_cache, cursor, pairings):
         commands[update].append((count, ids[0], ids[1]))
     await cursor.executemany(update, commands[update])
 
-async def update_pos(word_cache, cursor, pos):
+async def update_pos(word_cache, cursor, pos): ###
     update = "UPDATE pos_list SET freq = freq + ? WHERE posid=? AND wordid=?"
     insert = "INSERT INTO pos_list (posid, wordid, freq) VALUES (?, ?, ?)"
     commands = dict()
@@ -72,7 +67,7 @@ async def update_pos(word_cache, cursor, pos):
             commands[update].append((count, posid, id))   
     await cursor.executemany(update, commands[update])
     
-async def update_db(db_name, frequencies, pairings, pos):
+async def update_db(db_name, frequencies, pairings, pos): ###
     """Async-ily updates the databaase"""
     word_cache = dict()
     commands = []
@@ -95,7 +90,7 @@ async def update_db(db_name, frequencies, pairings, pos):
     await update_pos(word_cache, await db.cursor(), pos)
     db.commit()
 
-def read_data(file_name):
+def read_data(file_name): ###
     """ Processes a file """
     lines = []
     pairings = defaultdict(int)
@@ -131,11 +126,11 @@ def is_english(s):
         return False
     return bool(re.match(r".*[a-zA-Z]", s))
 
-def do_index(token):
+def do_index(token): 
     """Should token be recorded in DB"""
     return (token.pos_ != "PROPN" and (is_english(token.text)))
 
-def extract_data(line):
+def extract_data(line): ###
     """
     pairings = {(word1, word2): count}
     frequencies = {word: count}
@@ -166,6 +161,8 @@ def extract_data(line):
     return [pairings, frequencies, words_pos]
 
 
+
+
 if __name__ == "__main__":
     #test = "AA/wiki_00"
     #read_data(WIKI_DIR + test)
@@ -179,8 +176,9 @@ if __name__ == "__main__":
     ns.db = DEFAULT_DB
     ns.total_lines = total_lines
 
-    make_db()
+    # assume db is made
 
+    # gets list of files to work through
     abspath = os.path.abspath(WIKI_DIR)
     files = []
     
@@ -201,6 +199,3 @@ if __name__ == "__main__":
     results = pool.imap_unordered(read_data, files, chunksize)
     for r in results: 
         print(r)
-
-
-

@@ -1,6 +1,7 @@
 #stuff to generate
 /text/corpora/
 /text/outputs/
+/text/one-shots/config.py
 *.db
 
 #Copypaste python gitignores
