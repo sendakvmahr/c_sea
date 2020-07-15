@@ -7,49 +7,53 @@ from collections import defaultdict
 from datetime import datetime
 
 import config
+import aiomysql
 import pymysql
 
-connection = pymysql.connect(host='localhost',
-                             user=config.sql_username,
-                             password=config.sql_pw,
-                             db=config.sql_db_name,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor)
+WIKI_DIR = "../corpora/wikiextractor/"
+DEG_ASSOCIATION = 2
+total_lines = 109579737
 
-print(connection)
 
-def refresh_pos(db):
-	db = connection.cursor()
+def reset_db(db):
+    """ mainly for testing"""
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM pos")
+    cursor.execute("ALTER TABLE pos AUTO_INCREMENT = 1")
     pos = ['ADJ', 'ADP', 'ADV', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NOUN', 'NUM', 'PART', 'PRON', 'PROPN', 'PUNCT', 'SCONJ', 'SYM', 'VERB', 'X']
-	sql = "INSERT INTO `pos` (`id`, `pos`) VALUES (%s, %s)"
+    sql = "INSERT INTO pos (id, pos) VALUES (%s, %s)"
     for p in range(len(pos)):
-		refresh_pos.execute(sql, (p+1, pos[p]))
+        print("{} : {}".format(p, pos[p]));
+        cursor.execute(sql, (p+1, pos[p]))
+    cursor.execute("DELETE FROM words")
+    cursor.execute("ALTER TABLE words AUTO_INCREMENT = 1")
+    cursor.execute("DELETE FROM pairings")
     db.commit()
 
 def now():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 async def update_pairings(word_cache, cursor, pairings): ###
-    update = "UPDATE pairings SET freq = freq + ? WHERE word1id=? AND word2id=?"
-    insert = "INSERT INTO pairings (word1id, word2id, freq) VALUES (?, ?, ?)"
+    update = "UPDATE pairings SET freq = freq + %s WHERE word1_id=%s AND word2_id=%s"
+    insert = "INSERT INTO pairings (word1_id, word2_id, freq) VALUES (%s, %s, %s)"
     commands = dict()
     commands[update] = []
     commands[insert] = []
+    collision_list = []
     for pairing, count in pairings.items():
         ids = (word_cache[pairing[0]], word_cache[pairing[1]])
-        await cursor.execute('SELECT * FROM pairings WHERE word1id=? AND word2id=?', ids)
-        is_in = await cursor.fetchone()
+        is_in = await cursor.execute('SELECT * FROM pairings WHERE word1_id=%s AND word2_id=%s', ids)
         if (not bool(is_in)):
             try:
                 await cursor.execute(insert, (ids[0], ids[1], 0))
-            except sqlite3.IntegrityError:
-                pass
+            except pymysql.err.IntegrityError as e:
+                pass # it's in, just update it
         commands[update].append((count, ids[0], ids[1]))
     await cursor.executemany(update, commands[update])
 
 async def update_pos(word_cache, cursor, pos): ###
-    update = "UPDATE pos_list SET freq = freq + ? WHERE posid=? AND wordid=?"
-    insert = "INSERT INTO pos_list (posid, wordid, freq) VALUES (?, ?, ?)"
+    update = "UPDATE pos_list SET freq = freq + %s WHERE pos_id=%s AND word_id=%s"
+    insert = "INSERT INTO pos_list (pos_id, word_id, freq) VALUES (%s, %s, %s)"
     commands = dict()
     commands[update] = []
     commands[insert] = []
@@ -57,38 +61,44 @@ async def update_pos(word_cache, cursor, pos): ###
         id = word_cache[word]
         for pos, count in pos_info.items():
             posid = ns.pos.index(pos) + 1
-            await cursor.execute('SELECT * FROM pos_list WHERE wordid=? AND posid=?', (id, posid))
-            is_in = await cursor.fetchone()
+            is_in = await cursor.execute('SELECT * FROM pos_list WHERE word_id=%s AND pos_id=%s', (id, posid))
             if (not bool(is_in)):
                 try:
                     await cursor.execute(insert, (posid, id, 0))
-                except sqlite3.IntegrityError:
-                    pass
+                except Exception as e:
+                    print(e)
+                    raise e
             commands[update].append((count, posid, id))   
     await cursor.executemany(update, commands[update])
     
-async def update_db(db_name, frequencies, pairings, pos): ###
+async def update_db(frequencies, pairings, pos): ###
     """Async-ily updates the databaase"""
     word_cache = dict()
     commands = []
-    db = await aiosqlite.connect(db_name)
+    db = await aiomysql.connect(host='localhost',
+                             user=config.sql_username,
+                             password=config.sql_pw,
+                             db=config.sql_db_name,
+                             charset='utf8mb4',
+                             cursorclass=aiomysql.cursors.DictCursor)
     cursor = await db.cursor()
     for word in frequencies:
-        await cursor.execute('SELECT id FROM words WHERE word=?', (word,))
-        fetch = await cursor.fetchone()
-        if (fetch != None):
-            await cursor.execute('INSERT INTO words (id, word, freq) VALUES (null, ?, ?)', (word, frequencies[word]))
-            await cursor.execute('SELECT id FROM words WHERE word=?', (word,))
-            id = await cursor.fetchone()[0]
+        is_in_db = await cursor.execute('SELECT id FROM words WHERE word=%s', (word,))
+        if (is_in_db == 0):
+            await cursor.execute('INSERT INTO words (id, word, freq) VALUES (null, %s, %s)', (word, frequencies[word]))
+            await cursor.execute('SELECT id FROM words WHERE word=%s', (word,))
+            word_id = await cursor.fetchone()
+            word_id = word_id["id"]
         else:
-            id = word[0]
-            await cursor.execute('UPDATE words SET freq = freq + ? WHERE word=?', (frequencies[word], word))
-        word_cache[word] = id
+            await cursor.execute('SELECT id FROM words WHERE word=%s', (word,))
+            word_id = await cursor.fetchone()
+            word_id = word_id["id"]
+        word_cache[word] = word_id
     await db.commit()
     await update_pairings(word_cache, await db.cursor(), pairings)
-    db.commit()
+    await db.commit()
     await update_pos(word_cache, await db.cursor(), pos)
-    db.commit()
+    await db.commit()
 
 def read_data(file_name): ###
     """ Processes a file """
@@ -102,6 +112,8 @@ def read_data(file_name): ###
     print("READ {} {}".format(file_name, now()))
     for line in lines:
         pa, fq, pos = extract_data(line.replace('"', ""))
+        ns.read_small +=1
+        print(ns.read_small)
         if pa != 0: # html line
             for word, count in fq.items():
                 frequencies[word] += count
@@ -112,7 +124,7 @@ def read_data(file_name): ###
                     parts_of_speech[word][pos] += count
     print("PROCESSED {} {}".format(file_name, now()))
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(update_db(ns.db, frequencies, pairings, parts_of_speech))
+    loop.run_until_complete(update_db(frequencies, pairings, parts_of_speech))
     loop.close()
     print("UPLOADED {} {}".format(file_name, now()))
     ns.read += len(lines)
@@ -130,7 +142,7 @@ def do_index(token):
     """Should token be recorded in DB"""
     return (token.pos_ != "PROPN" and (is_english(token.text)))
 
-def extract_data(line): ###
+def extract_data(line): 
     """
     pairings = {(word1, word2): count}
     frequencies = {word: count}
@@ -157,23 +169,28 @@ def extract_data(line): ###
                     pairings[(line[ti-i-1].text.lower(), line[ti].text.lower())] += 1
             for i in range(upper):
                 if do_index(line[ti+i+1]):
-                    pairings[(line[ti].text.lower(), line[ti+i+1].text.lower())] += 1             
+                    pairings[(line[ti].text.lower(), line[ti+i+1].text.lower())] += 1           
     return [pairings, frequencies, words_pos]
 
 
-
-
 if __name__ == "__main__":
-    #test = "AA/wiki_00"
-    #read_data(WIKI_DIR + test)
-
+    """
+    db = pymysql.connect(host='localhost',
+        user=config.sql_username,
+        password=config.sql_pw,
+        db=config.sql_db_name,
+        charset='utf8mb4',
+        cursorclass=pymysql.cursors.DictCursor)
+    reset_db(db)
+    db.close()
+    """
     # assigns globals to shared namespace
     manager = multiprocessing.Manager()
     ns = manager.Namespace()
     ns.read = 0
+    ns.read_small = read_small
     ns.pos = ['ADJ', 'ADP', 'ADV', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NOUN', 'NUM', 'PART', 'PRON', 'PROPN', 'PUNCT', 'SCONJ', 'SYM', 'VERB', 'X']
     ns.degree = DEG_ASSOCIATION
-    ns.db = DEFAULT_DB
     ns.total_lines = total_lines
 
     # assume db is made
@@ -189,8 +206,10 @@ if __name__ == "__main__":
                 fpath = os.path.join(f1path, f)
                 if not (os.path.isdir(fpath)):
                     files.append(fpath)
+    files = ["../corpora/test0.txt", "../corpora/test1.txt", "../corpora/test2.txt"]
+    # test len is ~1800 lines
     
-    
+
     # print(multiprocessing.cpu_count()) #4
     num_processes = 3
     chunksize = int(len(files) / num_processes)
