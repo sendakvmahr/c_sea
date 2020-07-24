@@ -2,7 +2,6 @@ import multiprocessing
 import os
 import re
 import spacy
-import asyncio
 from collections import defaultdict
 from datetime import datetime
 
@@ -32,7 +31,7 @@ def reset_db(db):
 def now():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-async def update_pairings(word_cache, cursor, pairings): ###
+def update_pairings(word_cache, cursor, pairings): ###
     update = "UPDATE pairings SET freq = freq + %s WHERE word1_id=%s AND word2_id=%s"
     insert = "INSERT INTO pairings (word1_id, word2_id, freq) VALUES (%s, %s, %s)"
     commands = dict()
@@ -41,16 +40,16 @@ async def update_pairings(word_cache, cursor, pairings): ###
     collision_list = []
     for pairing, count in pairings.items():
         ids = (word_cache[pairing[0]], word_cache[pairing[1]])
-        is_in = await cursor.execute('SELECT * FROM pairings WHERE word1_id=%s AND word2_id=%s', ids)
+        is_in = cursor.execute('SELECT * FROM pairings WHERE word1_id=%s AND word2_id=%s', ids)
         if (not bool(is_in)):
             try:
-                await cursor.execute(insert, (ids[0], ids[1], 0))
+                cursor.execute(insert, (ids[0], ids[1], 0))
             except pymysql.err.IntegrityError as e:
                 pass # it's in, just update it
         commands[update].append((count, ids[0], ids[1]))
-    await cursor.executemany(update, commands[update])
+    cursor.executemany(update, commands[update])
 
-async def update_pos(word_cache, cursor, pos): ###
+def update_pos(word_cache, cursor, pos): ###
     update = "UPDATE pos_list SET freq = freq + %s WHERE pos_id=%s AND word_id=%s"
     insert = "INSERT INTO pos_list (pos_id, word_id, freq) VALUES (%s, %s, %s)"
     commands = dict()
@@ -60,43 +59,53 @@ async def update_pos(word_cache, cursor, pos): ###
         id = word_cache[word]
         for pos, count in pos_info.items():
             posid = ns.pos.index(pos) + 1
-            is_in = await cursor.execute('SELECT * FROM pos_list WHERE word_id=%s AND pos_id=%s', (id, posid))
+            is_in = cursor.execute('SELECT * FROM pos_list WHERE word_id=%s AND pos_id=%s', (id, posid))
             if (not bool(is_in)):
                 try:
-                    await cursor.execute(insert, (posid, id, 0))
+                    cursor.execute(insert, (posid, id, 0))
                 except pymysql.err.IntegrityError as e:
                     pass # it's in, just update it
             commands[update].append((count, posid, id))   
-    await cursor.executemany(update, commands[update])
+    cursor.executemany(update, commands[update])
     
-async def update_db(frequencies, pairings, pos): ###
-    """Async-ily updates the databaase"""
-    word_cache = dict()
-    commands = []
-    db = await aiomysql.connect(host='localhost',
-                             user=config.sql_username,
-                             password=config.sql_pw,
-                             db=config.sql_db_name,
-                             charset='utf8mb4',
-                             cursorclass=aiomysql.cursors.DictCursor)
-    cursor = await db.cursor()
-    for word in frequencies:
-        is_in_db = await cursor.execute('SELECT id FROM words WHERE word=%s', (word,))
-        if (is_in_db == 0):
-            await cursor.execute('INSERT INTO words (id, word, freq) VALUES (null, %s, %s)', (word, frequencies[word]))
-            await cursor.execute('SELECT id FROM words WHERE word=%s', (word,))
-            word_id = await cursor.fetchone()
-            word_id = word_id["id"]
-        else:
-            await cursor.execute('SELECT id FROM words WHERE word=%s', (word,))
-            word_id = await cursor.fetchone()
-            word_id = word_id["id"]
-        word_cache[word] = word_id
-    await db.commit()
-    await update_pairings(word_cache, await db.cursor(), pairings)
-    await db.commit()
-    await update_pos(word_cache, await db.cursor(), pos)
-    await db.commit()
+def update_db(frequencies, pairings, pos, filename): ###
+    max_tries = 10
+    tries = 0;
+    while tries < max_tries:
+        try:
+            """Async-ily updates the databaase"""
+            word_cache = dict()
+            commands = []
+            db = pymysql.connect(host='localhost',
+                                     user=config.sql_username,
+                                     password=config.sql_pw,
+                                     db=config.sql_db_name,
+                                     charset='utf8mb4',
+                                     cursorclass=pymysql.cursors.DictCursor)
+            cursor = db.cursor()
+            for word in frequencies:
+                is_in_db = cursor.execute('SELECT id FROM words WHERE word=%s', (word,))
+                if (is_in_db == 0):
+                    cursor.execute('INSERT INTO words (id, word, freq) VALUES (null, %s, %s)', (word, frequencies[word]))
+                    cursor.execute('SELECT id FROM words WHERE word=%s', (word,))
+                    word_id = cursor.fetchone()
+                    word_id = word_id["id"]
+                else:
+                    cursor.execute('SELECT id FROM words WHERE word=%s', (word,))
+                    word_id = cursor.fetchone()
+                    word_id = word_id["id"]
+                word_cache[word] = word_id
+            update_pairings(word_cache, db.cursor(), pairings)
+            update_pos(word_cache, db.cursor(), pos)
+            db.commit()
+            tries = max_tries
+        except pymysql.err.OperationalError as e:
+            tries += 1 #deadlock, try again
+            if tries == max_tries:
+                print("!!! retry {} !!!".format(filename))
+
+
+
 
 def read_data(file_name): ###
     """ Processes a file """
@@ -107,7 +116,7 @@ def read_data(file_name): ###
     
     with open(file_name) as file:
         lines = file.readlines()
-    print("READ {} {}".format(file_name, now()))
+    print("READ      {} {}".format(file_name, now()))
     for line in lines:
         pa, fq, pos = extract_data(line.replace('"', ""))
         if pa != 0: # html line
@@ -119,11 +128,8 @@ def read_data(file_name): ###
                 for pos, count in pos_count.items():
                     parts_of_speech[word][pos] += count
     print("PROCESSED {} {}".format(file_name, now()))
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    loop.run_until_complete(update_db(frequencies, pairings, parts_of_speech))
-    loop.close()
-    print("UPLOADED {} {}".format(file_name, now()))
+    update_db(frequencies, pairings, parts_of_speech, file_name)
+    print("UPLOADED  {} {}".format(file_name, now()))
     ns.read += len(lines)
     print("{}% done".format(ns.read / ns.total_lines))
 
@@ -202,7 +208,7 @@ if __name__ == "__main__":
                 fpath = os.path.join(f1path, f)
                 if not (os.path.isdir(fpath)):
                     files.append(fpath)
-    files = ["../corpora/test0.txt", "../corpora/test1.txt", "../corpora/test2.txt"] * 9
+    #files = ["../corpora/test0.txt", "../corpora/test1.txt", "../corpora/test2.txt"] * 9
     # test len is ~1800 lines
     
 
@@ -213,12 +219,5 @@ if __name__ == "__main__":
     
     results = pool.imap_unordered(read_data, files, chunksize)
     for r in results: 
-        print(r)
-
-
-"""
-issue - 
-    raise RuntimeError('Event loop is closed')
-RuntimeError: Event loop is closed
-
-"""
+        pass
+    print("done")

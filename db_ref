@@ -1,0 +1,20 @@
+CREATE TABLE `words` ( 
+  `id` int(20) NOT NULL AUTO_INCREMENT UNIQUE,
+  `word` text(30) NOT NULL,
+  `pos` int(10) NOT NULL,
+  `freq` int(10) NOT NULL,
+  CONSTRAINT word_pk PRIMARY KEY (`id`),
+  CONSTRAINT word_uniq UNIQUE (`word`(30), `pos`)
+);
+
+CREATE TABLE `pairings` (
+	`word1_id` int(10) NOT NULL,
+	`word2_id` int(10) NOT NULL,
+	`freq` int(20),
+	CONSTRAINT pairing_pk PRIMARY KEY (`word1_id`,`word2_id`)
+);
+CREATE TABLE `pos` (
+	`id` int(10) NOT NULL,
+	`pos` text(20) NOT NULL,
+	CONSTRAINT table_pk PRIMARY KEY (`id`)
+);

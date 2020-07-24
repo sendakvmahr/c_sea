@@ -1,8 +1,10 @@
 #stuff to generate
 /text/corpora/
+/text/processed_corpora/
 /text/outputs/
 /text/one-shots/config.py
 *.db
+config.py
 
 #Copypaste python gitignores
 # Byte-compiled / optimized / DLL files
