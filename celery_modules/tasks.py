@@ -7,20 +7,22 @@ import datetime, os, random
 import config
 
 
-if config.computer_name in config.tiers["router"] :
+if config.computer_name in config.roles["router"]:
 	@task
 	def send_daily_email():
+		# get record of all stuff procesed in teh night
+		# get things for me to do today
 		print("email sent")	
 
 
-if config.computer_name in config.tiers["router"] or config.computer_name in config.tiers["tier_1"]:
-
+if config.computer_name in config.roles["router"] or config.computer_name in config.roles["processor"]:
 	@task
 	def process_files():
 		print("a file has been processed.")	
 
 	@task
 	def read_file(read_until):
+		#task needs reworking
 		stoptime = datetime.datetime.now().replace(hour=read_until) 
 		processed_files = []
 		files = os.listdir(os.path.abspath(config.to_read_dir))

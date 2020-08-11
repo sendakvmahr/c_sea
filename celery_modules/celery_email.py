@@ -18,9 +18,9 @@ app.conf.CELERYBEAT_SCHEDULE = {
         'schedule': 5.0,
         'options': {'queue': 'router3'},
     },
-    'very-6-seconds': {
+    'daily_email': {
         'task': 'celery_modules.tasks.send_daily_email',
-        'schedule': 6.0,
+        'schedule': crontab(hour=23, minute=53),
         'options': {'queue': 'router'},
     },
 }
